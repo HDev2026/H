@@ -2750,6 +2750,7 @@ window.visualViewport?.addEventListener('resize', syncLayoutHeights);
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible') return;
   if (!currentUserId) return;
+  if (isSendingMessage) return;
 
   await loadMessagesFromSupabase();
 
@@ -2760,6 +2761,7 @@ document.addEventListener('visibilitychange', async () => {
 
 window.addEventListener('focus', async () => {
   if (!currentUserId) return;
+  if (isSendingMessage) return;
 
   await loadMessagesFromSupabase();
 
@@ -2846,10 +2848,26 @@ async function loadMessagesFromSupabase() {
       return await hydrateMessageMedia(msg);
     })
   );
-
+  
+  // احتفظ بالرسائل المؤقتة المحلية أثناء الرفع
+  const optimisticMessages = data.filter(msg =>
+    String(msg.id).startsWith('temp-')
+  );
+  
+  // امسح فقط الرسائل الحقيقية القديمة
   data.length = 0;
   data.push(...mapped);
-
+  
+  // أعد إضافة المؤقتة إذا لم تصل بعد من السيرفر
+  for (const tempMsg of optimisticMessages) {
+    data.push(tempMsg);
+  }
+  
+  // رتب الكل حسب الوقت
+  data.sort((a, b) => {
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+  
   renderMessages();
   messagesLoaded = true;
 }
