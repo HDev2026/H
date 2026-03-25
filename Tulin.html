@@ -2957,7 +2957,12 @@ checkSession().then(async (ok) => {
 autoGrowTextarea();
 updateComposerActionButton();
 syncLayoutHeights();
-lockChat();
+
+if (isAutoLockDisabled()) {
+  unlockChat();
+} else {
+  lockChat();
+}
   
 </script>
 
