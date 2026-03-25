@@ -1363,7 +1363,7 @@ function renderReplySnippet(msg) {
     replyCache.get(String(msg.replyToId)) ||
     null;
 
-  const name = original ? (original.mine ? 'أنت' : 'الطرف الآخر') : 'رسالة';
+  const name = original ? (original.mine ? 'أنت' : 'حبيبك') : 'رسالة';
   const text = original ? buildReplyPreviewText(original) : 'رسالة';
 
   return `
