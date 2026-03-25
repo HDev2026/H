@@ -2127,7 +2127,7 @@ async function sendMessage() {
 
   if (!currentUserId) {
     alert('الجلسة غير موجودة، سجل الدخول من جديد');
-    window.location.href = 'login.html';
+    window.location.href = 'TulinLogin.html';
     return;
   }
 
@@ -2563,7 +2563,7 @@ async function logout() {
     return;
   }
 
-  window.location.href = 'login.html';
+  window.location.href = 'TulinLogin.html';
 }
 
 async function checkSession() {
@@ -2578,7 +2578,7 @@ async function checkSession() {
   
   if (!session || !session.user || !session.user.email) {
     alert('الجلسة غير موجودة، ارجع لصفحة تسجيل الدخول ثم ادخل من جديد');
-    window.location.href = 'login.html';
+    window.location.href = 'TulinLogin.html';
     return false;
   }
 
