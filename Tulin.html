@@ -2210,6 +2210,9 @@ async function sendMessage() {
   isSendingMessage = true;
   sendBtn.disabled = true;
 
+  let optimisticId = null;
+  let localPreviewUrl = '';
+
   try {
     if (editingId) {
       const { error } = await sb
@@ -2241,11 +2244,12 @@ async function sendMessage() {
 
     let attachmentPath = null;
     let attachmentType = null;
-    let optimisticId = null;
-    let optimisticMsg = null;
 
-    if (selectedAttachment) {
-      attachmentType = getAttachmentTypeFromFile(selectedAttachment);
+    // نحفظ الملف قبل clearSelectedAttachment
+    const fileToSend = selectedAttachment;
+
+    if (fileToSend) {
+      attachmentType = getAttachmentTypeFromFile(fileToSend);
 
       if (
         attachmentType !== 'image' &&
@@ -2256,9 +2260,12 @@ async function sendMessage() {
         return;
       }
 
+      // رابط محلي جديد مستقل عن selectedAttachmentUrl
+      localPreviewUrl = URL.createObjectURL(fileToSend);
+
       optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-      optimisticMsg = {
+      const optimisticMsg = {
         id: optimisticId,
         mine: true,
         text,
@@ -2269,9 +2276,9 @@ async function sendMessage() {
         createdAt: new Date().toISOString(),
         replyToId: replyingToId || null,
         type: attachmentType,
-        file: selectedAttachmentUrl || '',
+        file: localPreviewUrl,
         attachmentPath: '',
-        fileName: selectedAttachment.name || '',
+        fileName: fileToSend.name || '',
         status: 'sending'
       };
 
@@ -2284,7 +2291,8 @@ async function sendMessage() {
       clearSelectedAttachment();
       updateComposerActionButton();
 
-      attachmentPath = await uploadAttachment(selectedAttachment);
+      // الرفع يتم من النسخة المحفوظة
+      attachmentPath = await uploadAttachment(fileToSend);
     }
 
     const { error } = await sb
@@ -2306,6 +2314,10 @@ async function sendMessage() {
         removeMessageFromUI(optimisticId);
       }
 
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
+
       console.error('Send error:', error);
       alert('فشل إرسال الرسالة');
       return;
@@ -2320,10 +2332,14 @@ async function sendMessage() {
     }
 
   } catch (err) {
-    if (typeof optimisticId !== 'undefined' && optimisticId) {
+    if (optimisticId) {
       const idx = data.findIndex(m => String(m.id) === String(optimisticId));
       if (idx !== -1) data.splice(idx, 1);
       removeMessageFromUI(optimisticId);
+    }
+
+    if (localPreviewUrl) {
+      URL.revokeObjectURL(localPreviewUrl);
     }
 
     console.error('Unexpected send error:', err);
@@ -2333,7 +2349,6 @@ async function sendMessage() {
     sendBtn.disabled = false;
   }
 }
-
   
 function getPoint(e) {
   if (e.touches?.length) {
