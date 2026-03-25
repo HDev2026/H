@@ -2295,42 +2295,110 @@ async function sendMessage() {
       attachmentPath = await uploadAttachment(fileToSend);
     }
 
-    const { error } = await sb
-      .from('chat_messages')
-      .insert([
-        {
-          user_id: currentUserId,
-          content: text,
-          reply_to_id: replyingToId || null,
-          attachment_path: attachmentPath,
-          attachment_type: attachmentType
-        }
-      ]);
-
-    if (error) {
-      if (optimisticId) {
-        const idx = data.findIndex(m => String(m.id) === String(optimisticId));
-        if (idx !== -1) data.splice(idx, 1);
-        removeMessageFromUI(optimisticId);
+    const { data: insertedRow, error } = await sb
+    .from('chat_messages')
+    .insert([
+      {
+        user_id: currentUserId,
+        content: text,
+        reply_to_id: replyingToId || null,
+        attachment_path: attachmentPath,
+        attachment_type: attachmentType
       }
-
-      if (localPreviewUrl) {
-        URL.revokeObjectURL(localPreviewUrl);
+    ])
+    .select(`
+      id,
+      user_id,
+      content,
+      sender_name,
+      attachment_path,
+      attachment_type,
+      reply_to_id,
+      created_at
+    `)
+    .single();
+  
+  if (error) {
+    if (optimisticId) {
+      const idx = data.findIndex(m => String(m.id) === String(optimisticId));
+      if (idx !== -1) data.splice(idx, 1);
+      removeMessageFromUI(optimisticId);
+    }
+  
+    if (localPreviewUrl) {
+      URL.revokeObjectURL(localPreviewUrl);
+    }
+  
+    console.error('Send error:', error);
+    alert('فشل إرسال الرسالة');
+    return;
+  }
+  
+  if (optimisticId && insertedRow) {
+    const hydratedInserted = await hydrateMessageMedia(
+      mapSupabaseRowToMessage(insertedRow)
+    );
+  
+    const idx = data.findIndex(m => String(m.id) === String(optimisticId));
+    if (idx !== -1) {
+      data[idx] = hydratedInserted;
+    }
+  
+    const oldEl = messagesEl.querySelector(`.msg-wrap[data-id="${String(optimisticId)}"]`);
+    if (oldEl) {
+      oldEl.dataset.id = String(hydratedInserted.id);
+      oldEl.className = `msg-wrap ${hydratedInserted.mine ? 'me' : 'other'}`;
+      oldEl.innerHTML = `
+        <div class="reply-hint">↩️</div>
+        <div class="msg ${hydratedInserted.mine ? 'me' : 'other'}">
+          ${renderReplySnippet(hydratedInserted)}
+          ${renderMessageContent(hydratedInserted)}
+          <div class="msg-meta">
+            ${hydratedInserted.edited ? '<span>(تم التعديل)</span>' : ''}
+            <span>${escapeHtml(hydratedInserted.time)}</span>
+          </div>
+        </div>
+      `;
+  
+      bindInteractions(oldEl, hydratedInserted);
+  
+      const replyJumpEl = oldEl.querySelector('[data-jump-to]');
+      if (replyJumpEl) {
+        replyJumpEl.style.cursor = 'pointer';
+        replyJumpEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          jumpToMessage(replyJumpEl.dataset.jumpTo);
+        });
       }
-
-      console.error('Send error:', error);
-      alert('فشل إرسال الرسالة');
-      return;
+  
+      const imageEl = oldEl.querySelector('[data-full-image]');
+      if (imageEl) {
+        imageEl.addEventListener('click', () => {
+          openMediaViewer('image', imageEl.dataset.fullImage);
+        });
+      }
+  
+      const openVideoBtn = oldEl.querySelector('[data-open-video]');
+      if (openVideoBtn) {
+        openVideoBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openMediaViewer('video', openVideoBtn.dataset.openVideo);
+        });
+      }
     }
-
-    if (!optimisticId) {
-      input.value = '';
-      autoGrowTextarea();
-      clearReplyPreview();
-      clearSelectedAttachment();
-      updateComposerActionButton();
+  
+    if (localPreviewUrl) {
+      URL.revokeObjectURL(localPreviewUrl);
     }
-
+  }
+  
+  if (!optimisticId) {
+    input.value = '';
+    autoGrowTextarea();
+    clearReplyPreview();
+    clearSelectedAttachment();
+    updateComposerActionButton();
+  }
   } catch (err) {
     if (optimisticId) {
       const idx = data.findIndex(m => String(m.id) === String(optimisticId));
