@@ -153,7 +153,7 @@
         const user = data.session?.user
 
         if (user && !user.is_anonymous && user.email) {
-            window.location.href = 'chatNoSupabase.html'
+            window.location.href = 'Tulin.html'
         }
     }
 
@@ -179,7 +179,7 @@
 
         showSuccess('تم تسجيل الدخول بنجاح...')
         setTimeout(() => {
-          window.location.href = 'chatNoSupabase.html'
+          window.location.href = 'Tulin.html'
         }, 700)
       } catch (err) {
         showError(err.message || 'فشل تسجيل الدخول')
