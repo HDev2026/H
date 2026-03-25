@@ -282,6 +282,14 @@ header{
 .msg-file{
   font-size:14px;
 }
+
+
+.msg-status{
+  font-size:11px;
+  color:#94a3b8;
+  margin-top:4px;
+}
+  
 /* composer fixed */
 .composer-shell{
   position:fixed;
@@ -1372,12 +1380,19 @@ function renderMessageContent(msg) {
     ? `<div class="msg-text">${escapeHtml(msg.text)}</div>`
     : '';
 
+  // 🔥 حالة الإرسال
+  let statusHtml = '';
+  if (msg.status === 'sending') {
+    statusHtml = `<div class="msg-status">⏳ جاري الإرسال...</div>`;
+  }
+
   if (msg.type === 'image') {
     return `
       <div class="msg-media">
         <img src="${msg.file}" class="msg-image" data-full-image="${msg.file}">
       </div>
       ${textHtml}
+      ${statusHtml}
     `;
   }
 
@@ -1390,6 +1405,7 @@ function renderMessageContent(msg) {
         </div>
       </div>
       ${textHtml}
+      ${statusHtml}
     `;
   }
 
@@ -1399,6 +1415,7 @@ function renderMessageContent(msg) {
         <audio src="${msg.file}" controls class="msg-audio"></audio>
       </div>
       ${textHtml}
+      ${statusHtml}
     `;
   }
 
@@ -1408,10 +1425,14 @@ function renderMessageContent(msg) {
         📎 ${escapeHtml(msg.fileName || 'ملف')}
       </div>
       ${textHtml}
+      ${statusHtml}
     `;
   }
 
-  return textHtml || `<div class="msg-text"></div>`;
+  return `
+    ${textHtml || `<div class="msg-text"></div>`}
+    ${statusHtml}
+  `;
 }
   
 function renderMessages() {
@@ -2220,6 +2241,8 @@ async function sendMessage() {
 
     let attachmentPath = null;
     let attachmentType = null;
+    let optimisticId = null;
+    let optimisticMsg = null;
 
     if (selectedAttachment) {
       attachmentType = getAttachmentTypeFromFile(selectedAttachment);
@@ -2232,6 +2255,34 @@ async function sendMessage() {
         alert('نربط الصور والفيديو والصوت فقط حاليًا');
         return;
       }
+
+      optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      optimisticMsg = {
+        id: optimisticId,
+        mine: true,
+        text,
+        time: new Date().toLocaleTimeString('ar', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        createdAt: new Date().toISOString(),
+        replyToId: replyingToId || null,
+        type: attachmentType,
+        file: selectedAttachmentUrl || '',
+        attachmentPath: '',
+        fileName: selectedAttachment.name || '',
+        status: 'sending'
+      };
+
+      data.push(optimisticMsg);
+      appendMessageToUI(optimisticMsg);
+
+      input.value = '';
+      autoGrowTextarea();
+      clearReplyPreview();
+      clearSelectedAttachment();
+      updateComposerActionButton();
 
       attachmentPath = await uploadAttachment(selectedAttachment);
     }
@@ -2249,18 +2300,32 @@ async function sendMessage() {
       ]);
 
     if (error) {
+      if (optimisticId) {
+        const idx = data.findIndex(m => String(m.id) === String(optimisticId));
+        if (idx !== -1) data.splice(idx, 1);
+        removeMessageFromUI(optimisticId);
+      }
+
       console.error('Send error:', error);
       alert('فشل إرسال الرسالة');
       return;
     }
 
-    input.value = '';
-    autoGrowTextarea();
-    clearReplyPreview();
-    clearSelectedAttachment();
-    updateComposerActionButton();
+    if (!optimisticId) {
+      input.value = '';
+      autoGrowTextarea();
+      clearReplyPreview();
+      clearSelectedAttachment();
+      updateComposerActionButton();
+    }
 
   } catch (err) {
+    if (typeof optimisticId !== 'undefined' && optimisticId) {
+      const idx = data.findIndex(m => String(m.id) === String(optimisticId));
+      if (idx !== -1) data.splice(idx, 1);
+      removeMessageFromUI(optimisticId);
+    }
+
     console.error('Unexpected send error:', err);
     alert('حدث خطأ غير متوقع أثناء الإرسال');
   } finally {
