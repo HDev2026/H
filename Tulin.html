@@ -930,8 +930,9 @@ button.send-btn svg{
 <div class="app">
   <header id="chatHeader">
     <div class="header-inner">
-      <button id="refreshBtn" class="header-action-btn" style="left:14px">↻</button>
-      <button id="logoutBtn" class="header-action-btn" style="left:56px">⎋</button>
+      <button id="settingsBtn" class="header-action-btn" style="left:14px" type="button" aria-label="الإعدادات">⚙️</button>
+      <button id="refreshBtn" class="header-action-btn" style="left:56px" type="button" aria-label="تحديث">↻</button>
+      <button id="logoutBtn" class="header-action-btn" style="left:98px" type="button" aria-label="تسجيل الخروج">⎋</button>
       <span>الخاص 🤍</span>
     </div>
   </header>
@@ -1026,6 +1027,29 @@ button.send-btn svg{
       </div>
     </div>
   </div>
+  <div class="menu-overlay hidden" id="settingsOverlay">
+  <div class="menu-center">
+    <div class="menu-sheet">
+      <div class="menu-head" style="display:block">الإعدادات</div>
+      <div style="padding:14px 16px; display:flex; flex-direction:column; gap:14px;">
+        <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; color:#fff;">
+          <span>إلغاء القفل التلقائي</span>
+          <input id="disableAutoLockToggle" type="checkbox" style="width:18px; height:18px; cursor:pointer;">
+        </label>
+
+        <div style="font-size:12px; color:var(--muted); line-height:1.7;">
+          عند تفعيل هذا الخيار لن ينقفل الشات تلقائيًا عند الخروج من الصفحة أو فقدان التركيز.
+        </div>
+
+        <button id="closeSettingsBtn" class="menu-btn" type="button">
+          <span class="menu-btn-label">
+            <span class="menu-btn-text">إغلاق</span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1037,6 +1061,11 @@ const root = document.documentElement;
 const headerEl = document.getElementById('chatHeader');
 const logoutBtn = document.getElementById('logoutBtn');
 const refreshBtn = document.getElementById('refreshBtn');
+
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const disableAutoLockToggle = document.getElementById('disableAutoLockToggle');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
   
 const composerShell = document.getElementById('composerShell');
 const messagesEl = document.getElementById('messages');
@@ -1071,6 +1100,8 @@ let channel = null;
 const CHAT_PIN = '2580';
 let enteredPin = '';
 let isChatLocked = true;
+
+const AUTO_LOCK_DISABLED_KEY = 'chat_auto_lock_disabled';
 
 let channelState = 'closed';
 let reconnectTimer = null;
@@ -1145,6 +1176,28 @@ function unlockChat() {
   lockScreen.classList.add('hidden');
 }
 
+function isAutoLockDisabled() {
+  return localStorage.getItem(AUTO_LOCK_DISABLED_KEY) === 'true';
+}
+
+function openSettings() {
+  disableAutoLockToggle.checked = isAutoLockDisabled();
+  settingsOverlay.classList.remove('hidden');
+  settingsOverlay.style.display = 'flex';
+}
+
+function closeSettings() {
+  settingsOverlay.classList.add('hidden');
+  settingsOverlay.style.display = 'none';
+}
+
+function saveAutoLockSetting() {
+  localStorage.setItem(
+    AUTO_LOCK_DISABLED_KEY,
+    disableAutoLockToggle.checked ? 'true' : 'false'
+  );
+}
+  
 async function refreshChat() {
   try {
     await loadMessagesFromSupabase();
@@ -2485,20 +2538,36 @@ mediaViewer.addEventListener('click', (e) => {
 });
 logoutBtn.addEventListener('click', logout);
 refreshBtn.addEventListener('click', refreshChat);
+
+settingsBtn.addEventListener('click', openSettings);
+
+closeSettingsBtn.addEventListener('click', closeSettings);
+
+disableAutoLockToggle.addEventListener('change', saveAutoLockSetting);
+
+settingsOverlay.addEventListener('click', (e) => {
+  if (e.target === settingsOverlay) {
+    closeSettings();
+  }
+});
   
 // 🔒 يقفل عند مغادرة الصفحة أو فقدان التركيز
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
+  if (document.hidden && !isAutoLockDisabled()) {
     lockChat();
   }
 });
 
 window.addEventListener('blur', () => {
-  lockChat();
+  if (!isAutoLockDisabled()) {
+    lockChat();
+  }
 });
 
 window.addEventListener('pagehide', () => {
-  lockChat();
+  if (!isAutoLockDisabled()) {
+    lockChat();
+  }
 });
   
 document.querySelectorAll('[data-pin-key]').forEach(btn => {
