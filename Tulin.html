@@ -1435,9 +1435,6 @@ function renderMessageContent(msg) {
 }
   
 function renderMessages() {
-    const wasNearBottom =
-      (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight) < 120;
-  
     messagesEl.innerHTML = '';
   
     data.forEach(msg => {
@@ -1485,13 +1482,8 @@ function renderMessages() {
     }
   });
 
-  requestAnimationFrame(() => {
-    syncLayoutHeights();
-
-    if (wasNearBottom) {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-  });
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  requestAnimationFrame(syncLayoutHeights);
 }
 
 function mapSupabaseRowToMessage(row) {
