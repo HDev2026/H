@@ -1433,6 +1433,20 @@ function renderMessageContent(msg) {
     ${statusHtml}
   `;
 }
+
+function preloadImage(src) {
+  return new Promise((resolve, reject) => {
+    if (!src) {
+      reject(new Error('No image src'));
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => resolve(src);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
   
 function renderMessages() {
     messagesEl.innerHTML = '';
@@ -3029,56 +3043,70 @@ function subscribeToMessages() {
             messagesEl.querySelector(`.msg-wrap[data-client-id="${String(rowClientId)}"]`);
 
           if (tempEl) {
-            tempEl.dataset.id = String(mapped.id);
-
-            if (rowClientId) {
-              tempEl.dataset.clientId = String(rowClientId);
-            }
-
-            tempEl.className = `msg-wrap ${mapped.mine ? 'me' : 'other'}`;
-            tempEl.innerHTML = `
-              <div class="reply-hint">↩️</div>
-              <div class="msg ${mapped.mine ? 'me' : 'other'}">
-                ${renderReplySnippet(mapped)}
-                ${renderMessageContent(mapped)}
-                <div class="msg-meta">
-                  ${mapped.edited ? '<span>(تم التعديل)</span>' : ''}
-                  <span>${escapeHtml(mapped.time)}</span>
+            const applyReplacement = () => {
+              tempEl.dataset.id = String(mapped.id);
+          
+              if (rowClientId) {
+                tempEl.dataset.clientId = String(rowClientId);
+              }
+          
+              tempEl.className = `msg-wrap ${mapped.mine ? 'me' : 'other'}`;
+              tempEl.innerHTML = `
+                <div class="reply-hint">↩️</div>
+                <div class="msg ${mapped.mine ? 'me' : 'other'}">
+                  ${renderReplySnippet(mapped)}
+                  ${renderMessageContent(mapped)}
+                  <div class="msg-meta">
+                    ${mapped.edited ? '<span>(تم التعديل)</span>' : ''}
+                    <span>${escapeHtml(mapped.time)}</span>
+                  </div>
                 </div>
-              </div>
-            `;
-
-            bindInteractions(tempEl, mapped);
-            pinToBottomAfterMediaLoads(tempEl);
-
-            const replyJumpEl = tempEl.querySelector('[data-jump-to]');
-            if (replyJumpEl) {
-              replyJumpEl.style.cursor = 'pointer';
-              replyJumpEl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                jumpToMessage(replyJumpEl.dataset.jumpTo);
-              });
-            }
-
-            const imageEl = tempEl.querySelector('[data-full-image]');
-            if (imageEl) {
-              imageEl.addEventListener('click', () => {
-                openMediaViewer('image', imageEl.dataset.fullImage);
-              });
-            }
-
-            const openVideoBtn = tempEl.querySelector('[data-open-video]');
-            if (openVideoBtn) {
-              openVideoBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openMediaViewer('video', openVideoBtn.dataset.openVideo);
-              });
+              `;
+          
+              bindInteractions(tempEl, mapped);
+              pinToBottomAfterMediaLoads(tempEl);
+          
+              const replyJumpEl = tempEl.querySelector('[data-jump-to]');
+              if (replyJumpEl) {
+                replyJumpEl.style.cursor = 'pointer';
+                replyJumpEl.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  jumpToMessage(replyJumpEl.dataset.jumpTo);
+                });
+              }
+          
+              const imageEl = tempEl.querySelector('[data-full-image]');
+              if (imageEl) {
+                imageEl.addEventListener('click', () => {
+                  openMediaViewer('image', imageEl.dataset.fullImage);
+                });
+              }
+          
+              const openVideoBtn = tempEl.querySelector('[data-open-video]');
+              if (openVideoBtn) {
+                openVideoBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  openMediaViewer('video', openVideoBtn.dataset.openVideo);
+                });
+              }
+            };
+          
+            // للصورة: لا نستبدل إلا بعد ما صورة السيرفر تصبح جاهزة
+            if (mapped.type === 'image' && mapped.file) {
+              try {
+                await preloadImage(mapped.file);
+                applyReplacement();
+              } catch (err) {
+                console.warn('Image preload failed, fallback replace:', err);
+                applyReplacement();
+              }
+            } else {
+              applyReplacement();
             }
           } else {
             // لو DOM اتغيّر أثناء التحديث، نعيد الرسم مرة واحدة بشكل نظيف
             renderMessages();
           }
-
           return;
         }
 
