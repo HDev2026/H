@@ -1456,6 +1456,7 @@ function renderMessages() {
 
     bindInteractions(wrap, msg);
     messagesEl.appendChild(wrap);
+    pinToBottomAfterMediaLoads(wrap);
 
     const replyJumpEl = wrap.querySelector('[data-jump-to]');
     if (replyJumpEl) {
@@ -1591,7 +1592,8 @@ function appendMessageToUI(msg) {
 
   bindInteractions(wrap, msg);
   messagesEl.appendChild(wrap);
-
+  pinToBottomAfterMediaLoads(wrap);
+  
   const replyJumpEl = wrap.querySelector('[data-jump-to]');
   if (replyJumpEl) {
     replyJumpEl.style.cursor = 'pointer';
