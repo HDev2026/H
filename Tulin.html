@@ -1435,9 +1435,12 @@ function renderMessageContent(msg) {
 }
   
 function renderMessages() {
-  messagesEl.innerHTML = '';
-
-  data.forEach(msg => {
+    const wasNearBottom =
+      (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight) < 120;
+  
+    messagesEl.innerHTML = '';
+  
+    data.forEach(msg => {
     const wrap = document.createElement('div');
     wrap.className = `msg-wrap ${msg.mine ? 'me' : 'other'}`;
     wrap.dataset.id = String(msg.id);
@@ -1482,8 +1485,13 @@ function renderMessages() {
     }
   });
 
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-  requestAnimationFrame(syncLayoutHeights);
+  requestAnimationFrame(() => {
+    syncLayoutHeights();
+
+    if (wasNearBottom) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  });
 }
 
 function mapSupabaseRowToMessage(row) {
