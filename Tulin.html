@@ -3059,18 +3059,27 @@ async function softSyncMessages() {
 
   await hydrateMissingReplyTargets(rows);
 
-  const serverIds = new Set(rows.map(row => String(row.id)));
+  const hydratedRows = await Promise.all(
+    rows.map(async (row) => {
+      const mapped = mapSupabaseRowToMessage(row);
+      return await hydrateMessageMedia(mapped);
+    })
+  );
 
-  const currentLatestWindowIds = data
-    .slice(-50)
-    .map(msg => String(msg.id));
+  const serverIds = new Set(hydratedRows.map(msg => String(msg.id)));
 
-  for (const msgId of currentLatestWindowIds) {
+  // 1) احذف فقط الرسائل الحقيقية التي لم تعد موجودة على السيرفر
+  //    ولا تلمس الرسائل المؤقتة temp-
+  const currentRealMessages = data.filter(msg => !String(msg.id).startsWith('temp-'));
+
+  for (const msg of currentRealMessages) {
+    const msgId = String(msg.id);
     if (!serverIds.has(msgId)) {
       const idx = data.findIndex(m => String(m.id) === msgId);
       if (idx !== -1) {
         data.splice(idx, 1);
       }
+
       removeMessageFromUI(msgId);
 
       if (replyingToId && String(replyingToId) === msgId) {
@@ -3079,13 +3088,28 @@ async function softSyncMessages() {
     }
   }
 
-  for (const row of rows) {
-    const exists = data.some(msg => String(msg.id) === String(row.id));
-    if (exists) continue;
+  // 2) أضف أو حدّث الرسائل القادمة من السيرفر بدون لمس temp messages
+  for (const serverMsg of hydratedRows) {
+    const existingIndex = data.findIndex(
+      msg => String(msg.id) === String(serverMsg.id)
+    );
 
-    const mapped = await hydrateMessageMedia(mapSupabaseRowToMessage(row));
-    insertMessageInOrder(mapped);
+    if (existingIndex !== -1) {
+      data[existingIndex] = {
+        ...data[existingIndex],
+        ...serverMsg,
+        status: undefined
+      };
+      continue;
+    }
+
+    insertMessageInOrder(serverMsg);
   }
+
+  // 3) رتّب البيانات مع الإبقاء على الرسائل المؤقتة
+  data.sort((a, b) => {
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
 }
   
 async function loadOlderMessages() {
