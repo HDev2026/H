@@ -1363,7 +1363,7 @@ function renderReplySnippet(msg) {
     replyCache.get(String(msg.replyToId)) ||
     null;
 
-  const name = original ? (original.mine ? 'أنت' : 'حبيبك') : 'رسالة';
+  const name = original ? (original.mine ? 'أنت' : 'حبيبي') : 'رسالة';
   const text = original ? buildReplyPreviewText(original) : 'رسالة';
 
   return `
@@ -1705,7 +1705,7 @@ function openReplyPreview(msgId) {
   editingId = null;
 
   const msg = getMsgById(msgId);
-  const name = msg?.mine ? 'أنت' : 'حبيبك';
+  const name = msg?.mine ? 'أنت' : 'حبيبي';
   const text = buildReplyPreviewText(msg);
 
   replyPreview.classList.remove('hidden');
