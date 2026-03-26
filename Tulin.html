@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>  6  </title>
+<title>   7   </title>
 
 <style>
 :root{
@@ -2872,7 +2872,8 @@ async function loadMessagesFromSupabase() {
       attachment_path,
       attachment_type,
       reply_to_id,
-      created_at
+      created_at,
+      client_id
     `)
     .order('created_at', { ascending: false })
     .limit(50);
@@ -2888,39 +2889,46 @@ async function loadMessagesFromSupabase() {
   for (const row of rows) {
     rememberReplyMessage(row);
   }
-  
+
   await hydrateMissingReplyTargets(rows);
 
   if (rows.length > 0) {
-  oldestMessageTime = rows[0].created_at;
-}
+    oldestMessageTime = rows[0].created_at;
+  }
 
   const mapped = await Promise.all(
     rows.map(async (row) => {
       const msg = mapSupabaseRowToMessage(row);
-      return await hydrateMessageMedia(msg);
+      const hydrated = await hydrateMessageMedia(msg);
+      hydrated.clientId = row.client_id || null;
+      return hydrated;
     })
   );
-  
-  // احتفظ بالرسائل المؤقتة المحلية أثناء الرفع
+
   const optimisticMessages = data.filter(msg =>
     String(msg.id).startsWith('temp-')
   );
-  
-  // امسح فقط الرسائل الحقيقية القديمة
+
+  const serverClientIds = new Set(
+    mapped
+      .map(msg => msg.clientId)
+      .filter(Boolean)
+      .map(String)
+  );
+
+  // احتفظ فقط بالرسائل المؤقتة التي لم تصل بعد من السيرفر
+  const unresolvedOptimisticMessages = optimisticMessages.filter(msg => {
+    if (!msg.clientId) return true;
+    return !serverClientIds.has(String(msg.clientId));
+  });
+
   data.length = 0;
-  data.push(...mapped);
-  
-  // أعد إضافة المؤقتة إذا لم تصل بعد من السيرفر
-  for (const tempMsg of optimisticMessages) {
-    data.push(tempMsg);
-  }
-  
-  // رتب الكل حسب الوقت
+  data.push(...mapped, ...unresolvedOptimisticMessages);
+
   data.sort((a, b) => {
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
-  
+
   renderMessages();
   messagesLoaded = true;
 }
