@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>اختبار </title>
+<title>اختبار2 </title>
 
 <style>
 :root{
@@ -1482,8 +1482,18 @@ function renderMessages() {
     }
   });
 
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-  requestAnimationFrame(syncLayoutHeights);
+  const distanceFromBottom =
+    messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+  
+  const isNearBottom = distanceFromBottom < 80;
+  
+  requestAnimationFrame(() => {
+    syncLayoutHeights();
+  
+    if (isNearBottom) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  });
 }
 
 function mapSupabaseRowToMessage(row) {
