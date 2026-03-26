@@ -1705,7 +1705,7 @@ function openReplyPreview(msgId) {
   editingId = null;
 
   const msg = getMsgById(msgId);
-  const name = msg?.mine ? 'أنت' : 'الطرف الآخر';
+  const name = msg?.mine ? 'أنت' : 'حبيبك';
   const text = buildReplyPreviewText(msg);
 
   replyPreview.classList.remove('hidden');
