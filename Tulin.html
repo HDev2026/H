@@ -1586,7 +1586,14 @@ function appendMessageToUI(msg) {
     });
   }
 
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  const distanceFromBottom =
+    messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+  
+  const isNearBottom = distanceFromBottom < 80;
+  
+  if (isNearBottom) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
 }
 
 function insertMessageInOrder(msg) {
