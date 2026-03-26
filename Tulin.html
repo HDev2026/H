@@ -1520,6 +1520,7 @@ function pinToBottomAfterMediaLoads(container) {
 function mapSupabaseRowToMessage(row) {
   return {
     id: row.id,
+    clientId: row.client_id || null,
     mine: row.user_id === currentUserId,
     text: row.content || '',
     time: new Date(row.created_at).toLocaleTimeString('ar', {
