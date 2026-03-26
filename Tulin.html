@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>اختبار5</title>
+<title>اختبار   6  </title>
 
 <style>
 :root{
@@ -1206,7 +1206,28 @@ function saveAutoLockSetting() {
 }
   
 async function refreshChat() {
-  console.log('refreshChat temporarily disabled for scroll debugging');
+  const wasNearBottom =
+    (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight) < 120;
+
+  const distanceFromBottom =
+    messagesEl.scrollHeight - messagesEl.scrollTop;
+
+  try {
+    await loadMessagesFromSupabase();
+
+    requestAnimationFrame(() => {
+      if (wasNearBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      } else {
+        messagesEl.scrollTop = Math.max(
+          0,
+          messagesEl.scrollHeight - distanceFromBottom
+        );
+      }
+    });
+  } catch (err) {
+    console.error('Refresh error:', err);
+  }
 }
 
 function submitPinDigit(digit) {
