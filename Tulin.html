@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>  5  </title>
+<title>  6  </title>
 
 <style>
 :root{
@@ -2224,7 +2224,7 @@ async function deleteMessage(id) {
   closeMenu();
 }
 
-  
+
 async function sendMessage() {
   const text = input.value.trim();
 
@@ -2255,7 +2255,6 @@ async function sendMessage() {
 
   console.log('[send] locked');
 
-  // ⛑️ حماية من التعليق (لو صار hang)
   const safetyTimeout = setTimeout(() => {
     console.warn('[send] force unlock (timeout)');
     isSendingMessage = false;
@@ -2266,6 +2265,7 @@ async function sendMessage() {
 
   let optimisticId = null;
   let localPreviewUrl = '';
+  let clientId = null;
 
   try {
     if (editingId) {
@@ -2309,6 +2309,8 @@ async function sendMessage() {
       size: fileToSend.size
     } : null);
 
+    clientId = `client-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     if (fileToSend) {
       attachmentType = getAttachmentTypeFromFile(fileToSend);
 
@@ -2322,11 +2324,11 @@ async function sendMessage() {
       }
 
       localPreviewUrl = URL.createObjectURL(fileToSend);
-
-      optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      optimisticId = `temp-${clientId}`;
 
       const optimisticMsg = {
         id: optimisticId,
+        clientId,
         mine: true,
         text,
         time: new Date().toLocaleTimeString('ar', {
@@ -2356,6 +2358,37 @@ async function sendMessage() {
       console.log('[send] upload start');
       attachmentPath = await uploadAttachment(fileToSend);
       console.log('[send] upload done:', attachmentPath);
+    } else {
+      optimisticId = `temp-${clientId}`;
+
+      const optimisticMsg = {
+        id: optimisticId,
+        clientId,
+        mine: true,
+        text,
+        time: new Date().toLocaleTimeString('ar', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        createdAt: new Date().toISOString(),
+        replyToId: replyingToId || null,
+        type: 'text',
+        file: '',
+        attachmentPath: '',
+        fileName: '',
+        status: 'sending'
+      };
+
+      console.log('[send] optimistic text message created');
+
+      data.push(optimisticMsg);
+      appendMessageToUI(optimisticMsg);
+
+      input.value = '';
+      autoGrowTextarea();
+      clearReplyPreview();
+      clearSelectedAttachment();
+      updateComposerActionButton();
     }
 
     console.log('[send] insert start');
@@ -2368,7 +2401,8 @@ async function sendMessage() {
           content: text,
           reply_to_id: replyingToId || null,
           attachment_path: attachmentPath,
-          attachment_type: attachmentType
+          attachment_type: attachmentType,
+          client_id: clientId
         }
       ])
       .select(`
@@ -2379,7 +2413,8 @@ async function sendMessage() {
         attachment_path,
         attachment_type,
         reply_to_id,
-        created_at
+        created_at,
+        client_id
       `)
       .single();
 
@@ -2402,48 +2437,10 @@ async function sendMessage() {
       return;
     }
 
-    if (optimisticId && insertedRow) {
-      console.log('[send] replace optimistic');
-
-      const hydratedInserted = await hydrateMessageMedia(
-        mapSupabaseRowToMessage(insertedRow)
-      );
-
-      const idx = data.findIndex(m => String(m.id) === String(optimisticId));
-      if (idx !== -1) {
-        data[idx] = hydratedInserted;
-      }
-
-      const oldEl = messagesEl.querySelector(`.msg-wrap[data-id="${String(optimisticId)}"]`);
-      if (oldEl) {
-        oldEl.dataset.id = String(hydratedInserted.id);
-        oldEl.className = `msg-wrap ${hydratedInserted.mine ? 'me' : 'other'}`;
-        oldEl.innerHTML = `
-          <div class="reply-hint">↩️</div>
-          <div class="msg ${hydratedInserted.mine ? 'me' : 'other'}">
-            ${renderReplySnippet(hydratedInserted)}
-            ${renderMessageContent(hydratedInserted)}
-            <div class="msg-meta">
-              ${hydratedInserted.edited ? '<span>(تم التعديل)</span>' : ''}
-              <span>${escapeHtml(hydratedInserted.time)}</span>
-            </div>
-          </div>
-        `;
-
-        bindInteractions(oldEl, hydratedInserted);
-      }
-
-      if (localPreviewUrl) {
-        URL.revokeObjectURL(localPreviewUrl);
-      }
-    }
-
-    if (!optimisticId) {
-      input.value = '';
-      autoGrowTextarea();
-      clearReplyPreview();
-      clearSelectedAttachment();
-      updateComposerActionButton();
+    // لا نستبدل هنا فورًا بشكل كامل
+    // ننتظر realtime ليربط الرسالة الحقيقية بالمؤقتة عبر client_id
+    if (insertedRow) {
+      console.log('[send] insert succeeded, waiting realtime merge', insertedRow.client_id);
     }
 
   } catch (err) {
@@ -2970,11 +2967,86 @@ function subscribeToMessages() {
       async (payload) => {
         const row = payload.new;
         if (!row) return;
-  
-        const exists = data.some(msg => String(msg.id) === String(row.id));
+
+        const rowClientId = row.client_id || null;
+
+        // 1) لو وصلت الرسالة الحقيقية لنفس الرسالة المؤقتة
+        if (rowClientId) {
+          const optimisticIndex = data.findIndex(
+            msg => msg.clientId && String(msg.clientId) === String(rowClientId)
+          );
+
+          if (optimisticIndex !== -1) {
+            const mapped = await hydrateMessageMedia(mapSupabaseRowToMessage(row));
+            mapped.clientId = rowClientId;
+
+            const oldTemp = data[optimisticIndex];
+            const oldTempId = oldTemp.id;
+
+            data[optimisticIndex] = {
+              ...mapped,
+              status: undefined
+            };
+
+            const oldEl = messagesEl.querySelector(`.msg-wrap[data-id="${String(oldTempId)}"]`);
+            if (oldEl) {
+              oldEl.dataset.id = String(mapped.id);
+              oldEl.className = `msg-wrap ${mapped.mine ? 'me' : 'other'}`;
+              oldEl.innerHTML = `
+                <div class="reply-hint">↩️</div>
+                <div class="msg ${mapped.mine ? 'me' : 'other'}">
+                  ${renderReplySnippet(mapped)}
+                  ${renderMessageContent(mapped)}
+                  <div class="msg-meta">
+                    ${mapped.edited ? '<span>(تم التعديل)</span>' : ''}
+                    <span>${escapeHtml(mapped.time)}</span>
+                  </div>
+                </div>
+              `;
+
+              bindInteractions(oldEl, mapped);
+              pinToBottomAfterMediaLoads(oldEl);
+
+              const replyJumpEl = oldEl.querySelector('[data-jump-to]');
+              if (replyJumpEl) {
+                replyJumpEl.style.cursor = 'pointer';
+                replyJumpEl.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  jumpToMessage(replyJumpEl.dataset.jumpTo);
+                });
+              }
+
+              const imageEl = oldEl.querySelector('[data-full-image]');
+              if (imageEl) {
+                imageEl.addEventListener('click', () => {
+                  openMediaViewer('image', imageEl.dataset.fullImage);
+                });
+              }
+
+              const openVideoBtn = oldEl.querySelector('[data-open-video]');
+              if (openVideoBtn) {
+                openVideoBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  openMediaViewer('video', openVideoBtn.dataset.openVideo);
+                });
+              }
+            }
+
+            return;
+          }
+        }
+
+        // 2) منع التكرار إذا كانت الرسالة موجودة أصلًا
+        const exists = data.some(msg =>
+          String(msg.id) === String(row.id) ||
+          (rowClientId && msg.clientId && String(msg.clientId) === String(rowClientId))
+        );
+
         if (exists) return;
-  
+
         const mapped = await hydrateMessageMedia(mapSupabaseRowToMessage(row));
+        mapped.clientId = rowClientId;
+
         data.push(mapped);
         appendMessageToUI(mapped);
       }
@@ -2989,14 +3061,14 @@ function subscribeToMessages() {
       (payload) => {
         const row = payload.old;
         if (!row) return;
-  
+
         const idx = data.findIndex(msg => String(msg.id) === String(row.id));
         if (idx !== -1) {
           data.splice(idx, 1);
         }
-  
+
         removeMessageFromUI(row.id);
-  
+
         if (replyingToId && String(replyingToId) === String(row.id)) {
           clearReplyPreview();
         }
@@ -3012,7 +3084,7 @@ function subscribeToMessages() {
       (payload) => {
         const row = payload.new;
         if (!row) return;
-  
+
         updateMessageInData(row.id, row.content || '');
         updateMessageInUI(row.id, row.content || '');
       }
