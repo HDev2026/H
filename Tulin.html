@@ -2979,19 +2979,6 @@ function subscribeToMessages() {
 
         const rowClientId = row.client_id || null;
 
-        // 🔴 منع أي duplicate إذا كان clientId موجود أصلًا
-        if (rowClientId) {
-          const alreadyExistsByClientId = data.some(
-            msg => msg.clientId && String(msg.clientId) === String(rowClientId)
-          );
-        
-          if (alreadyExistsByClientId) {
-            // إذا كانت temp موجودة سيتم استبدالها لاحقًا
-            // وإذا كانت الحقيقية موجودة لا نضيف نسخة ثانية
-            return;
-          }
-        }
-        
         // 1) لو وصلت الرسالة الحقيقية لنفس الرسالة المؤقتة
         if (rowClientId) {
           const optimisticIndex = data.findIndex(
