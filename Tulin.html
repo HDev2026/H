@@ -3087,6 +3087,7 @@ async function softSyncMessages() {
     insertMessageInOrder(mapped);
   }
 }
+  
 async function loadOlderMessages() {
   if (isLoadingOlder) return;
   if (!oldestMessageTime) return;
