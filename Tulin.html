@@ -1456,8 +1456,7 @@ function renderMessages() {
 
     bindInteractions(wrap, msg);
     messagesEl.appendChild(wrap);
-    pinToBottomAfterMediaLoads(wrap);
-      
+
     const replyJumpEl = wrap.querySelector('[data-jump-to]');
     if (replyJumpEl) {
       replyJumpEl.style.cursor = 'pointer';
@@ -1485,36 +1484,6 @@ function renderMessages() {
 
   messagesEl.scrollTop = messagesEl.scrollHeight;
   requestAnimationFrame(syncLayoutHeights);
-}
-
-function pinToBottomAfterMediaLoads(container) {
-  const mediaEls = container.querySelectorAll('img, video');
-  if (!mediaEls.length) return;
-
-  const stickToBottom = () => {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-
-    requestAnimationFrame(() => {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    });
-  };
-
-  mediaEls.forEach((el) => {
-    if (el.tagName === 'IMG') {
-      if (!el.complete) {
-        el.addEventListener('load', stickToBottom, { once: true });
-      }
-    }
-
-    if (el.tagName === 'VIDEO') {
-      if (el.readyState < 1) {
-        el.addEventListener('loadedmetadata', stickToBottom, { once: true });
-      }
-      if (el.readyState < 2) {
-        el.addEventListener('loadeddata', stickToBottom, { once: true });
-      }
-    }
-  });
 }
 
 function mapSupabaseRowToMessage(row) {
@@ -1592,8 +1561,7 @@ function appendMessageToUI(msg) {
 
   bindInteractions(wrap, msg);
   messagesEl.appendChild(wrap);
-  pinToBottomAfterMediaLoads(wrap);
-  
+
   const replyJumpEl = wrap.querySelector('[data-jump-to]');
   if (replyJumpEl) {
     replyJumpEl.style.cursor = 'pointer';
