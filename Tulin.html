@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>   1   </title>
+<title>   2   </title>
 
 <style>
 :root{
@@ -2269,6 +2269,7 @@ async function sendMessage() {
   }, 15000);
 
   let optimisticId = null;
+  const replyToIdToSend = replyingToId || null;
   let localPreviewUrl = '';
   let clientId = null;
 
@@ -2341,7 +2342,7 @@ async function sendMessage() {
           minute: '2-digit'
         }),
         createdAt: new Date().toISOString(),
-        replyToId: replyingToId || null,
+        replyToId: replyToIdToSend,
         type: attachmentType,
         file: localPreviewUrl,
         attachmentPath: '',
@@ -2353,10 +2354,9 @@ async function sendMessage() {
 
       data.push(optimisticMsg);
       appendMessageToUI(optimisticMsg);
-
+      
       input.value = '';
       autoGrowTextarea();
-      clearReplyPreview();
       clearSelectedAttachment();
       updateComposerActionButton();
 
@@ -2376,7 +2376,7 @@ async function sendMessage() {
           minute: '2-digit'
         }),
         createdAt: new Date().toISOString(),
-        replyToId: replyingToId || null,
+        replyToId: replyToIdToSend,
         type: 'text',
         file: '',
         attachmentPath: '',
@@ -2391,7 +2391,6 @@ async function sendMessage() {
 
       input.value = '';
       autoGrowTextarea();
-      clearReplyPreview();
       clearSelectedAttachment();
       updateComposerActionButton();
     }
