@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>   4   </title>
+<title>   5   </title>
 
 <style>
 :root{
@@ -2318,8 +2318,8 @@ async function sendMessage() {
       }
 
       updateMessageInUI(editingId, text);
-
-      editingId = null;
+      
+      clearReplyPreview();
       input.value = '';
       autoGrowTextarea();
       updateComposerActionButton();
