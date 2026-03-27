@@ -2985,127 +2985,88 @@ function subscribeToMessages() {
         const mapped = await hydrateMessageMedia(mapSupabaseRowToMessage(row));
         mapped.clientId = rowClientId;
 
-        // 1) لو هذه الرسالة تخص optimistic message عندي
-        let optimisticIndex = -1;
-
+        // 1) إذا هذه الرسالة تقابل optimistic message محلي
         if (rowClientId) {
-          optimisticIndex = data.findIndex(
+          const optimisticIndex = data.findIndex(
             msg =>
               String(msg.id).startsWith('temp-') &&
               msg.clientId &&
               String(msg.clientId) === String(rowClientId)
           );
-        }
 
-        if (optimisticIndex !== -1) {
-          const tempMsg = data[optimisticIndex];
-          const tempId = String(tempMsg.id);
+          if (optimisticIndex !== -1) {
+            const tempMsg = data[optimisticIndex];
+            const tempId = String(tempMsg.id);
 
-          // استبدال الرسالة في data
-          data[optimisticIndex] = {
-            ...mapped,
-            status: undefined
-          };
+            data[optimisticIndex] = {
+              ...mapped,
+              status: undefined
+            };
 
-          // حذف أي نسخة حقيقية مكررة قد تكون أضيفت سابقًا
-          for (let i = data.length - 1; i >= 0; i--) {
-            if (i === optimisticIndex) continue;
+            const tempEl = messagesEl.querySelector(
+              `.msg-wrap[data-id="${tempId}"]`
+            );
 
-            const sameRealId = String(data[i].id) === String(mapped.id);
-            const sameClientId =
-              rowClientId &&
-              data[i].clientId &&
-              String(data[i].clientId) === String(rowClientId);
-
-            if (sameRealId || sameClientId) {
-              const duplicateId = String(data[i].id);
-              data.splice(i, 1);
-              removeMessageFromUI(duplicateId);
-            }
-          }
-
-          const tempEl =
-            messagesEl.querySelector(`.msg-wrap[data-id="${tempId}"]`) ||
-            messagesEl.querySelector(`.msg-wrap[data-client-id="${String(rowClientId)}"]`);
-
-          if (tempEl) {
-            tempEl.dataset.id = String(mapped.id);
-
-            if (rowClientId) {
-              tempEl.dataset.clientId = String(rowClientId);
-            }
-
-            tempEl.className = `msg-wrap ${mapped.mine ? 'me' : 'other'}`;
-            tempEl.innerHTML = `
-              <div class="reply-hint">↩️</div>
-              <div class="msg ${mapped.mine ? 'me' : 'other'}">
-                ${renderReplySnippet(mapped)}
-                ${renderMessageContent(mapped)}
-                <div class="msg-meta">
-                  ${mapped.edited ? '<span>(تم التعديل)</span>' : ''}
-                  <span>${escapeHtml(mapped.time)}</span>
+            if (tempEl) {
+              tempEl.dataset.id = String(mapped.id);
+              tempEl.className = `msg-wrap ${mapped.mine ? 'me' : 'other'}`;
+              tempEl.innerHTML = `
+                <div class="reply-hint">↩️</div>
+                <div class="msg ${mapped.mine ? 'me' : 'other'}">
+                  ${renderReplySnippet(mapped)}
+                  ${renderMessageContent(mapped)}
+                  <div class="msg-meta">
+                    ${mapped.edited ? '<span>(تم التعديل)</span>' : ''}
+                    <span>${escapeHtml(mapped.time)}</span>
+                  </div>
                 </div>
-              </div>
-            `;
+              `;
 
-            bindInteractions(tempEl, mapped);
-            pinToBottomAfterMediaLoads(tempEl);
+              bindInteractions(tempEl, mapped);
+              pinToBottomAfterMediaLoads(tempEl);
 
-            const replyJumpEl = tempEl.querySelector('[data-jump-to]');
-            if (replyJumpEl) {
-              replyJumpEl.style.cursor = 'pointer';
-              replyJumpEl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                jumpToMessage(replyJumpEl.dataset.jumpTo);
-              });
+              const replyJumpEl = tempEl.querySelector('[data-jump-to]');
+              if (replyJumpEl) {
+                replyJumpEl.style.cursor = 'pointer';
+                replyJumpEl.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  jumpToMessage(replyJumpEl.dataset.jumpTo);
+                });
+              }
+
+              const imageEl = tempEl.querySelector('[data-full-image]');
+              if (imageEl) {
+                imageEl.addEventListener('click', () => {
+                  openMediaViewer('image', imageEl.dataset.fullImage);
+                });
+              }
+
+              const openVideoBtn = tempEl.querySelector('[data-open-video]');
+              if (openVideoBtn) {
+                openVideoBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  openMediaViewer('video', openVideoBtn.dataset.openVideo);
+                });
+              }
+            } else {
+              renderMessages();
             }
 
-            const imageEl = tempEl.querySelector('[data-full-image]');
-            if (imageEl) {
-              imageEl.addEventListener('click', () => {
-                openMediaViewer('image', imageEl.dataset.fullImage);
-              });
-            }
-
-            const openVideoBtn = tempEl.querySelector('[data-open-video]');
-            if (openVideoBtn) {
-              openVideoBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openMediaViewer('video', openVideoBtn.dataset.openVideo);
-              });
-            }
-          } else {
-            // لو DOM اتغيّر أثناء التحديث، نعيد الرسم مرة واحدة بشكل نظيف
-            renderMessages();
+            return;
           }
-
-          return;
         }
 
-        // 2) إذا الرسالة موجودة أصلًا، لا تضفها مرة ثانية
+        // 2) لا تضف الرسالة إذا كانت موجودة أصلًا
         const exists = data.some(msg =>
           String(msg.id) === String(row.id) ||
-          (rowClientId && msg.clientId && String(msg.clientId) === String(rowClientId))
+          (
+            rowClientId &&
+            msg.clientId &&
+            String(msg.clientId) === String(rowClientId)
+          )
         );
 
-        if (exists) {
-          return;
-        }
-
-        // 3) تنظيف أي عنصر DOM مكرر قديم قبل الإضافة
-        const existingDomById = messagesEl.querySelector(`.msg-wrap[data-id="${String(row.id)}"]`);
-        if (existingDomById) {
-          existingDomById.remove();
-        }
-
-        if (rowClientId) {
-          const existingDomByClientId = messagesEl.querySelector(
-            `.msg-wrap[data-client-id="${String(rowClientId)}"]`
-          );
-          if (existingDomByClientId) {
-            existingDomByClientId.remove();
-          }
-        }
+        if (exists) return;
 
         data.push(mapped);
         appendMessageToUI(mapped);
