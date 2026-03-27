@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>   3   </title>
+<title>   4   </title>
 
 <style>
 :root{
@@ -2992,11 +2992,9 @@ function subscribeToMessages() {
         if (rowClientId) {
           const optimisticIndex = data.findIndex(
             msg =>
-              String(msg.id).startsWith('temp-') &&
               msg.clientId &&
               String(msg.clientId) === String(rowClientId)
           );
-
           if (optimisticIndex !== -1) {
             const tempMsg = data[optimisticIndex];
             const tempId = String(tempMsg.id);
