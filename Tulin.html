@@ -1947,10 +1947,30 @@ async function startRecording() {
   }
 
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(mediaStream);
-    recordedChunks = [];
-    recordingSeconds = 0;
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        let recordingMimeType = '';
+        
+        if (window.MediaRecorder && typeof MediaRecorder.isTypeSupported === 'function') {
+          if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            recordingMimeType = 'audio/mp4';
+          } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            recordingMimeType = 'audio/webm;codecs=opus';
+          } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+            recordingMimeType = 'audio/webm';
+          } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+            recordingMimeType = 'audio/ogg;codecs=opus';
+          } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+            recordingMimeType = 'audio/ogg';
+          }
+        }
+        
+        mediaRecorder = recordingMimeType
+          ? new MediaRecorder(mediaStream, { mimeType: recordingMimeType })
+          : new MediaRecorder(mediaStream);
+        
+        recordedChunks = [];
+        recordingSeconds = 0;
 
     mediaRecorder.addEventListener('dataavailable', (event) => {
       if (event.data && event.data.size > 0) {
@@ -1971,7 +1991,16 @@ async function startRecording() {
         return;
       }
     
-      const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
+      let ext = 'webm';
+
+      if (mimeType.includes('mp4')) {
+        ext = 'm4a';
+      } else if (mimeType.includes('ogg')) {
+        ext = 'ogg';
+      } else if (mimeType.includes('webm')) {
+        ext = 'webm';
+      }
+
       const audioBlob = new Blob(recordedChunks, { type: mimeType });
       selectedAttachment = new File([audioBlob], `recording_${Date.now()}.${ext}`, { type: mimeType });
     
