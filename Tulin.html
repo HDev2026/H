@@ -1732,6 +1732,7 @@ function updateMessageInData(messageId, newText) {
 
 function clearReplyPreview() {
   replyingToId = null;
+  editingId = null;
   replyPreview.classList.add('hidden');
   replyPreview.innerHTML = '';
   requestAnimationFrame(syncLayoutHeights);
@@ -2172,12 +2173,33 @@ function editMessage(id) {
   const msg = getMsgById(id);
   if (!msg || !msg.mine) return;
 
-  editingId = id;
   clearReplyPreview();
   clearSelectedAttachment();
-  input.value = msg.text;
+
+  editingId = id;
+  input.value = msg.text || '';
+
+  replyPreview.classList.remove('hidden');
+  replyPreview.innerHTML = `
+    <div class="reply-preview-box">
+      <div class="reply-preview-main">
+        <div class="reply-preview-title">تعديل رسالتك</div>
+        <div class="reply-preview-text">${escapeHtml(msg.text || '')}</div>
+      </div>
+      <button class="reply-close" id="closeReplyBtn" type="button">×</button>
+    </div>
+  `;
+
+  document.getElementById('closeReplyBtn').addEventListener('click', () => {
+    clearReplyPreview();
+    input.value = '';
+    autoGrowTextarea();
+    updateComposerActionButton();
+  });
+
   autoGrowTextarea();
   updateComposerActionButton();
+  requestAnimationFrame(syncLayoutHeights);
   input.focus();
 }
 
