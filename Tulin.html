@@ -2403,7 +2403,7 @@ async function sendMessage() {
         {
           user_id: currentUserId,
           content: text,
-          reply_to_id: replyingToId || null,
+          reply_to_id: replyToIdToSend,
           attachment_path: attachmentPath,
           attachment_type: attachmentType,
           client_id: clientId
