@@ -2909,29 +2909,30 @@ async function loadMessagesFromSupabase() {
     })
   );
 
-  const optimisticMessages = data.filter(msg =>
+  const currentOptimisticMessages = data.filter(msg =>
     String(msg.id).startsWith('temp-')
   );
 
-  const serverClientIds = new Set(
-    mapped
-      .map(msg => msg.clientId)
-      .filter(Boolean)
-      .map(String)
-  );
+  const merged = [...mapped];
 
-  // احتفظ فقط بالرسائل المؤقتة التي لم تصل بعد من السيرفر
-  const unresolvedOptimisticMessages = optimisticMessages.filter(msg => {
-    if (!msg.clientId) return true;
-    return !serverClientIds.has(String(msg.clientId));
+  for (const tempMsg of currentOptimisticMessages) {
+    const hasServerMatch = mapped.some(serverMsg =>
+      (tempMsg.clientId && serverMsg.clientId &&
+        String(tempMsg.clientId) === String(serverMsg.clientId)) ||
+      String(tempMsg.id) === String(serverMsg.id)
+    );
+
+    if (!hasServerMatch) {
+      merged.push(tempMsg);
+    }
+  }
+
+  merged.sort((a, b) => {
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
   data.length = 0;
-  data.push(...mapped, ...unresolvedOptimisticMessages);
-
-  data.sort((a, b) => {
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
+  data.push(...merged);
 
   renderMessages();
   messagesLoaded = true;
